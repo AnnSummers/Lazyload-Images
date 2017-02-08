@@ -116,16 +116,13 @@
     this.onResize         = opts.hasOwnProperty('onResize') ? opts.onResize : true;
     this.lazyload         = opts.hasOwnProperty('lazyload') ? opts.lazyload : true;
     this.scrolled         = false;
-    this.availablePixelRatios = opts.availablePixelRatios || [1, 2];
     this.availableWidths  = opts.availableWidths || defaultWidths;
     this.onImagesReplaced = opts.onImagesReplaced || noop;
     this.widthsMap        = {};
-    this.refreshPixelRatio();
-    this.widthInterpolator = opts.widthInterpolator || returnFn;
 
     if (typeof this.availableWidths !== 'function') {
       if (typeof this.availableWidths.length === 'number') {
-        this.widthsMap = Imager.createWidthsMap(this.availableWidths, this.widthInterpolator, this.devicePixelRatio);
+        this.widthsMap = Imager.createWidthsMap(this.availableWidths);
       }
       else {
         this.widthsMap = this.availableWidths;
@@ -150,14 +147,15 @@
 
     elementsOrSelector = elementsOrSelector || this.selector;
     var elements = typeof elementsOrSelector === 'string' ?
-  document.querySelectorAll(elementsOrSelector) : // Selector
-  elementsOrSelector; // Elements (NodeList or array of Nodes)
+      document.querySelectorAll(elementsOrSelector) : // Selector
+      elementsOrSelector; // Elements (NodeList or array of Nodes)
 
-  if (elements && elements.length) {
-    var additional = applyEach(elements, returnFn);
-    this.changeDivsToEmptyImages(additional);
-    this.divs = this.divs.concat(additional);
-  }
+    if (elements && elements.length) {
+      var additional = applyEach(elements, returnFn);
+
+      this.changeDivsToEmptyImages(additional);
+      this.divs = this.divs.concat(additional);
+    }
   };
 
   Imager.prototype.scrollCheck = function () {
@@ -166,24 +164,25 @@
     var elements = [];
 
     if (this.scrolled) {
-  // collects a subset of not-yet-responsive images and not offscreen anymore
-  applyEach(this.divs, function (element) {
-    if (self.isPlaceholder(element)) {
-      ++offscreenImageCount;
+    // collects a subset of not-yet-responsive images and not offscreen anymore
+    applyEach(this.divs, function (element) {
+      if (self.isPlaceholder(element)) {
+        ++offscreenImageCount;
 
-      if (self.isThisElementOnScreen(element)) {
-        elements.push(element);
+        if (self.isThisElementOnScreen(element)) {
+          elements.push(element);
+        }
       }
+    });
+
+    if (offscreenImageCount === 0) {
+      window.clearInterval(self.interval);
     }
-  });
 
-  if (offscreenImageCount === 0) {
-    window.clearInterval(self.interval);
-  }
+    this.changeDivsToEmptyImages(elements);
 
-  this.changeDivsToEmptyImages(elements);
-  this.scrolled = false;
-  }
+    this.scrolled = false;
+    }
   };
 
   Imager.prototype.init = function () {
@@ -225,36 +224,38 @@
   };
 
   Imager.prototype.createGif = function (element) {
-  // if the element is already a responsive image then we don't replace it again
-  if (element.className.match(new RegExp('(^| )' + this.className + '( |$)'))) {
-    return element;
-  }
 
-  var elementClassName = element.getAttribute('data-class');
-  var elementWidth = element.getAttribute('data-width');
-  var gif = this.gif.cloneNode(false);
+    // if the element is already a responsive image then we don't replace it again
+    if (element.className.match(new RegExp('(^| )' + this.className + '( |$)'))) {
+      return element;
+    }
 
-  if (elementWidth) {
-    gif.width = elementWidth;
-    gif.setAttribute('data-width', elementWidth);
-  }
+    var elementClassName = element.getAttribute('data-class');
+    var elementWidth = element.getAttribute('data-width');
+    var gif = this.gif.cloneNode(false);
 
-  gif.className = (elementClassName ? elementClassName + ' ' : '') + this.className;
-  gif.setAttribute('data-src', element.getAttribute('data-src'));
-  gif.setAttribute('alt', element.getAttribute('data-alt') || this.gif.alt);
+    if (elementWidth) {
+      gif.width = elementWidth;
+      gif.setAttribute('data-width', elementWidth);
+    }
 
-  element.parentNode.replaceChild(gif, element);
+    gif.className = (elementClassName ? elementClassName + ' ' : '') + this.className;
+    gif.setAttribute('data-src', element.getAttribute('data-src'));
+    if (element.getAttribute('data-sizes')) {
+      gif.setAttribute('data-sizes', element.getAttribute('data-sizes'));
+    }
+    gif.setAttribute('alt', element.getAttribute('data-alt') || this.gif.alt);
 
-  return gif;
+    element.parentNode.replaceChild(gif, element);
+
+    return gif;
   };
 
   Imager.prototype.changeDivsToEmptyImages = function (elements) {
     var self = this;
-
     applyEach(elements, function (element, i) {
-      elements[i] = self.createGif(element);
+      elements[i] = self.createGif(element,'img');
     });
-
     if (this.initialized) {
       this.checkImagesNeedReplacing(elements);
     }
@@ -278,19 +279,19 @@
   * @returns {boolean}
   */
   Imager.prototype.isThisElementOnScreen = function (element) {
-  // document.body.scrollTop was working in Chrome but didn't work on Firefox, so had to resort to window.pageYOffset
-  // but can't fallback to document.body.scrollTop as that doesn't work in IE with a doctype (?) so have to use document.documentElement.scrollTop
-  var elementOffsetTop = 0;
-  var offset = Imager.getPageOffset() + this.lazyloadOffset;
+    // document.body.scrollTop was working in Chrome but didn't work on Firefox, so had to resort to window.pageYOffset
+    // but can't fallback to document.body.scrollTop as that doesn't work in IE with a doctype (?) so have to use document.documentElement.scrollTop
+    var elementOffsetTop = 0;
+    var offset = Imager.getPageOffset() + this.lazyloadOffset;
 
-  if (element.offsetParent) {
-    do {
-      elementOffsetTop += element.offsetTop;
+    if (element.offsetParent) {
+      do {
+        elementOffsetTop += element.offsetTop;
+      }
+      while (element = element.offsetParent);
     }
-    while (element = element.offsetParent);
-  }
 
-  return elementOffsetTop < (this.viewportHeight + offset);
+    return elementOffsetTop < (this.viewportHeight + offset);
   };
 
   Imager.prototype.checkImagesNeedReplacing = function (images, filterFn) {
@@ -299,7 +300,6 @@
 
     if (!this.isResizing) {
       this.isResizing = true;
-      this.refreshPixelRatio();
 
       applyEach(images, function (image) {
         if (filterFn(image)) {
@@ -324,13 +324,26 @@
     computedWidth = typeof this.availableWidths === 'function' ? this.availableWidths(image)
     : this.determineAppropriateResolution(image);
 
+    var imageSource = image.getAttribute('data-src');
+
+    if ( image.getAttribute('data-sizes') ) {
+      var sizes = JSON.parse( image.getAttribute('data-sizes') ), sze, arrSizes = [];
+      for (sze in sizes) {
+        arrSizes.push(sze);
+      }
+      var newSize = Imager.getClosestValue(computedWidth, arrSizes);
+      if ( newSize >= computedWidth ) {
+        imageSource = sizes[newSize]
+      }
+    }
+
     image.width = computedWidth;
 
-    if (!this.isPlaceholder(image) && computedWidth <= naturalWidth) {
+    if (!image.getAttribute('data-sizes') && !this.isPlaceholder(image) && computedWidth <= naturalWidth) {
       return;
     }
 
-    image.src = this.changeImageSrcToUseNewImageDimensions(image.getAttribute('data-src'), computedWidth);
+    image.src = this.changeImageSrcToUseNewImageDimensions(imageSource, computedWidth);
     image.removeAttribute('width');
     image.removeAttribute('height');
   };
@@ -348,35 +361,26 @@
   * @api
   * @since 1.0.1
   */
-  Imager.prototype.refreshPixelRatio = function refreshPixelRatio() {
+  /*Imager.prototype.refreshPixelRatio = function refreshPixelRatio() {
     this.devicePixelRatio = Imager.getClosestValue(Imager.getPixelRatio(), this.availablePixelRatios);
-  };
+  };*/
 
   Imager.prototype.changeImageSrcToUseNewImageDimensions = function (src, selectedWidth) {
-    return src
-    .replace(/{width}/g, Imager.transforms.width(selectedWidth, this.widthsMap))
-    .replace(/{pixel_ratio}/g, Imager.transforms.pixelRatio(this.devicePixelRatio));
+    return src.replace(/{width}/g, Imager.transforms.width(selectedWidth, this.widthsMap))
   };
 
-  Imager.getPixelRatio = function getPixelRatio(context) {
-    return (context || window)['devicePixelRatio'] || 1;
-  };
-
-  Imager.createWidthsMap = function createWidthsMap (widths, interpolator, pixelRatio) {
+  Imager.createWidthsMap = function createWidthsMap (widths) {
     var map = {},
     i   = widths.length;
 
     while (i--) {
-      map[widths[i]] = interpolator(widths[i], pixelRatio);
+      map[widths[i]] = widths[i];
     }
 
     return map;
   };
 
   Imager.transforms = {
-    pixelRatio: function (value) {
-      return value === 1 ? '' : '-' + value + 'x';
-    },
     width: function (width, map) {
       return map[width] || width;
     }
