@@ -318,13 +318,13 @@
   * @param {HTMLImageElement} image
   */
   Imager.prototype.replaceImagesBasedOnScreenDimensions = function (image) {
-    var computedWidth, naturalWidth;
+    var computedWidth, naturalWidth, altImage = false;
 
     naturalWidth = Imager.getNaturalWidth(image);
     computedWidth = typeof this.availableWidths === 'function' ? this.availableWidths(image)
     : this.determineAppropriateResolution(image);
 
-    var imageSource = image.getAttribute('data-src');
+    var imageSource = image.getAttribute('data-src') || '';
 
     if ( image.getAttribute('data-sizes') ) {
       var sizes = JSON.parse( image.getAttribute('data-sizes') ), sze, arrSizes = [];
@@ -332,14 +332,15 @@
         arrSizes.push(sze);
       }
       var newSize = Imager.getClosestValue(computedWidth, arrSizes);
-      if ( newSize >= computedWidth ) {
-        imageSource = sizes[newSize]
+      if ( newSize <= computedWidth ) {
+        altImage = true;
+        imageSource = sizes[newSize];
       }
     }
 
     image.width = computedWidth;
 
-    if (!image.getAttribute('data-sizes') && !this.isPlaceholder(image) && computedWidth <= naturalWidth) {
+    if (altImage && !this.isPlaceholder(image) && computedWidth <= naturalWidth) {
       return;
     }
 
