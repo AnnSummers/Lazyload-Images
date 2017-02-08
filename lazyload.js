@@ -1,6 +1,8 @@
 ;(function (window, document) {
   'use strict';
 
+  var webPSupport = null;
+
   var addEvent = (function () {
     if (document.addEventListener) {
       return function addStandardEventListener(el, eventName, fn) {
@@ -25,6 +27,14 @@
     }
 
     return keys;
+  };
+
+  var testWebP = function (callback) {
+      var webP = new Image();
+      webP.src = 'data:image/webp;base64,UklGRjoAAABXRUJQVlA4IC4AAACyAgCdASoCAAIALmk0mk0iIiIiIgBoSygABc6WWgAA/veff/0PP8bA//LwYAAA';
+      webP.onload = webP.onerror = function () {
+        callback(webP.height === 2);
+      };
   };
 
   var applyEach = function (collection, callbackEach) {
@@ -192,17 +202,26 @@
     var filterFn = trueFn;
 
     if (this.lazyload) {
-      this.registerScrollEvent();
 
-      this.scrolled = true;
-      self.scrollCheck();
+      //Check WebP Support
+      testWebP(function(supported) {
+        webPSupport = supported;
+
+        self.registerScrollEvent();
+
+        self.scrolled = true;
+        self.scrollCheck();
+      });
 
       filterFn = function (element) {
         return self.isPlaceholder(element) === false;
       };
-    }
-    else {
-      this.checkImagesNeedReplacing(this.divs);
+    } else {
+      //Check WebP Support
+      testWebP(function(supported) {
+        webPSupport = supported;
+        self.checkImagesNeedReplacing(self.divs);
+      });
     }
 
     if (this.onResize) {
@@ -367,6 +386,7 @@
   };*/
 
   Imager.prototype.changeImageSrcToUseNewImageDimensions = function (src, selectedWidth) {
+    src = webPSupport ? src.replace(/{format}/g, 'webp') : src.replace(/{format}/g, 'jpeg');
     return src.replace(/{width}/g, Imager.transforms.width(selectedWidth, this.widthsMap))
   };
 
@@ -406,7 +426,7 @@
   * @returns {Number}
   */
   Imager.getClosestValue = function getClosestValue(baseValue, candidates) {
-    var i             = candidates.length,
+    var i         = candidates.length,
     selectedWidth = candidates[i - 1];
 
     baseValue = parseFloat(baseValue);
